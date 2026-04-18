@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ data extraction rules. Populate with <include>/<exclude> once we add DB/files. -->
+<data-extraction-rules />
