@@ -1,6 +1,5 @@
 package net.meshpeak.taiju.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -9,6 +8,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import net.meshpeak.taiju.domain.model.AppTheme
 
 private val FallbackLightColors =
     lightColorScheme(
@@ -36,14 +36,21 @@ private val FallbackDarkColors =
 
 @Composable
 fun TaijuTheme(
-    useDarkTheme: Boolean = isSystemInDarkTheme(),
+    appTheme: AppTheme = AppTheme.SYSTEM,
     useDynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val systemDark = isSystemInDarkTheme()
+    val useDarkTheme =
+        when (appTheme) {
+            AppTheme.SYSTEM -> systemDark
+            AppTheme.LIGHT -> false
+            AppTheme.DARK -> true
+        }
     val context = LocalContext.current
     val colorScheme =
         when {
-            useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            useDynamicColor ->
                 if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             useDarkTheme -> FallbackDarkColors
             else -> FallbackLightColors

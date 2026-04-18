@@ -8,6 +8,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import net.meshpeak.taiju.data.local.TaijuDatabase
+import net.meshpeak.taiju.data.local.dao.MemoDao
+import net.meshpeak.taiju.data.local.dao.WeightEntryDao
 import javax.inject.Singleton
 
 @Module
@@ -22,4 +24,10 @@ object DatabaseModule {
     ): TaijuDatabase =
         Room.databaseBuilder(context, TaijuDatabase::class.java, DATABASE_NAME)
             .build()
+
+    @Provides
+    fun provideWeightEntryDao(database: TaijuDatabase): WeightEntryDao = database.weightEntryDao()
+
+    @Provides
+    fun provideMemoDao(database: TaijuDatabase): MemoDao = database.memoDao()
 }

@@ -3,6 +3,8 @@ package net.meshpeak.taiju.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import net.meshpeak.taiju.data.local.dao.MemoDao
+import net.meshpeak.taiju.data.local.dao.WeightEntryDao
 import net.meshpeak.taiju.data.local.entity.MemoEntity
 import net.meshpeak.taiju.data.local.entity.WeightEntryEntity
 
@@ -12,4 +14,8 @@ import net.meshpeak.taiju.data.local.entity.WeightEntryEntity
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
-abstract class TaijuDatabase : RoomDatabase()
+abstract class TaijuDatabase : RoomDatabase() {
+    abstract fun weightEntryDao(): WeightEntryDao
+
+    abstract fun memoDao(): MemoDao
+}
