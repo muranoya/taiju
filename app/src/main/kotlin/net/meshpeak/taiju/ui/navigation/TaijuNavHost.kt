@@ -1,5 +1,7 @@
 package net.meshpeak.taiju.ui.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -22,6 +24,10 @@ fun TaijuNavHost(
         navController = navController,
         startDestination = TaijuDestination.Home.route,
         modifier = modifier,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
     ) {
         composable(TaijuDestination.Home.route) {
             HomeScreen(

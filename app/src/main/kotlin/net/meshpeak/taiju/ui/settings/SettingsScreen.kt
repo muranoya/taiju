@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.meshpeak.taiju.ui.settings.components.AppVersionSection
 import net.meshpeak.taiju.ui.settings.components.CsvSection
 import net.meshpeak.taiju.ui.settings.components.TargetWeightSection
 import net.meshpeak.taiju.ui.settings.components.ThemePickerSection
@@ -69,6 +70,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     importLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
                 },
             )
+            AppVersionSection()
         }
     }
 }
