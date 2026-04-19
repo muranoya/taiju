@@ -1,5 +1,9 @@
 # taiju — 体重管理アプリ
 
+このドキュメントは **実装から読み取れない情報 (意図・方針・外部契約・運用ルール) のみ** を記述する。パッケージ構成・Entity のフィールド定義・具体的な Composable 名・依存ライブラリのバージョンなどはコードと `gradle/libs.versions.toml` が正であり、ここには書かない。
+
+---
+
 ## 1. プロジェクト概要
 
 ユーザー個人の体重管理・ダイエット支援を目的とした Android ネイティブアプリ。日々の体重を記録し、カレンダーと折れ線グラフで推移を可視化する。各日に複数のメモを残せるため、行動と体重変化の関連を後から振り返れる。データはローカル保存のみで、CSV による import/export を通じて外部とやり取りする。
@@ -14,132 +18,66 @@
 - CSV からの **インポート** (UPSERT)
 - 日毎メモの追加 — **件数固定ではなく自由に複数追加可能**
 
-## 3. 技術スタック
+## 3. 技術選定の方向性
 
-| 領域 | 採用技術 | 備考 |
-|---|---|---|
-| 言語 | Kotlin | |
-| UI | Jetpack Compose + Material 3 | Compose BOM で統一管理 |
-| テーマ | Material You (Dynamic Color) | minSdk 31 を活かす |
-| ナビゲーション | Navigation Compose | 単一 Activity |
-| DB | Room | UPSERT・Flow クエリを活用 |
-| アノテーション処理 | KSP | Room / Hilt 用 |
-| DI | Hilt | 軽量だが将来分割を見据える |
-| 非同期 | Kotlin Coroutines + Flow | |
-| 日付 | kotlinx-datetime + java.time | モデルは `LocalDate`、表示は `DateTimeFormatter` |
-| シリアライズ | kotlinx-serialization | 設定保存・補助用途 |
-| グラフ | Vico | Compose-native の折れ線 |
-| ビルド | Gradle Kotlin DSL + Version Catalog | `gradle/libs.versions.toml` で一元管理 |
-| 静的解析 | ktlint | spotless 経由でも可 |
+- Kotlin + Jetpack Compose + Material 3 の Android ネイティブアプリ
+- **minSdk は 31** を前提にし、Material You (Dynamic Color) を活用する
+- 単一 Activity + Compose Navigation、DI は Hilt、ローカル DB は Room、折れ線グラフは Vico、日付型は kotlinx-datetime を採用
+- 採用ライブラリと具体的なバージョンは `gradle/libs.versions.toml` が正。AGP / Kotlin / Compose Compiler は安定版の最新に追従する
 
-- **minSdk = 31 (Android 12)** / targetSdk は最新安定版に追従
-- AGP / Kotlin / Compose Compiler は安定版の最新を使用
+## 4. アーキテクチャ原則
 
----
-
-## 4. アーキテクチャ
-
-- **単一 Activity + Compose Navigation**
-- **Clean Architecture lite** (シングルモジュール `:app` から開始、複雑化したら分割)
-  - `data/` — Room の entity / dao / repository 実装
-  - `domain/` — プレーンなモデル / UseCase
-  - `ui/` — Composable / ViewModel / Theme
-  - `di/` — Hilt module
+- **単一 Activity + Compose Navigation** (`:app` シングルモジュール、Clean Architecture lite。複雑化したらモジュール分割を検討)
 - **状態管理**: ViewModel が `StateFlow<UiState>` を公開し、Compose 側は `collectAsStateWithLifecycle` で受け取る
-- **副作用** (DB I/O・CSV I/O) は UseCase に集約し、ViewModel は状態合成のみを担う
+- **副作用** (DB I/O・CSV I/O など) は UseCase に集約し、ViewModel は状態合成のみを担う
 
 ```
 Composable ──(intent)──▶ ViewModel ──▶ UseCase ──▶ Repository ──▶ Room
        ◀────(StateFlow<UiState>)────┘
 ```
 
----
+## 5. データモデル原則
 
-## 5. ディレクトリ構成
+- **1日あたり: 体重は最大1件 / メモは0件以上の任意件数**
+- 日付は `kotlinx.datetime.LocalDate` で保持する (永続化は ISO-8601 文字列)
+- **Room スキーマ管理**:
+  - `@Database(exportSchema = true)` で `app/schemas/` 配下に生成される JSON は **コミットする**。スキーマ差分は PR でレビューする
+  - スキーマ変更時は `@Database(version)` をインクリメントし、`Migration` (単純な変更なら `@AutoMigration`) を **明示的に書く**
+  - **`fallbackToDestructiveMigration` は使わない** — ローカル専用のデータとはいえ、ユーザーの記録を失わせないため
 
-```
-taiju/
-├── app/
-│   └── src/main/kotlin/net/meshpeak/taiju/
-│       ├── data/
-│       │   ├── local/         # Room: TaijuDatabase, *Entity, *Dao
-│       │   └── repository/    # *Repository 実装
-│       ├── domain/
-│       │   ├── model/         # WeightEntry, Memo (UI/data から独立)
-│       │   └── usecase/       # GetWeightHistory, UpsertWeight, ...
-│       ├── ui/
-│       │   ├── navigation/    # NavHost, ルート定義
-│       │   ├── theme/         # Color, Typography, Theme
-│       │   ├── home/          # 画面ごとに subpkg
-│       │   ├── calendar/
-│       │   ├── chart/
-│       │   ├── detail/
-│       │   ├── settings/
-│       │   └── components/    # 横断的な共通 Composable
-│       ├── di/                # Hilt modules
-│       ├── TaijuApplication.kt
-│       └── MainActivity.kt
-├── gradle/
-│   └── libs.versions.toml
-├── build.gradle.kts
-├── settings.gradle.kts
-└── CLAUDE.md
-```
-
-- パッケージ名: `net.meshpeak.taiju`
-- すべての Kotlin ソースは `src/main/kotlin/` 配下 (`java/` は使わない)
-
----
-
-## 6. データモデル
-
-### Room Entity
-
-| Entity | フィールド | 制約 |
-|---|---|---|
-| `WeightEntry` | `id: Long` (PK, autoGenerate) / `date: LocalDate` / `weightKg: Double` / `createdAt: Instant` / `updatedAt: Instant` | `date` UNIQUE |
-| `Memo` | `id: Long` (PK, autoGenerate) / `date: LocalDate` / `content: String` / `sortOrder: Int` / `createdAt: Instant` / `updatedAt: Instant` | `date` で複数件可 |
-
-- 1日あたり: **体重は最大1件 / メモは0件以上の任意件数**
-- `date` は `kotlinx.datetime.LocalDate` (Room TypeConverter で ISO-8601 文字列にシリアライズ)
-
----
-
-## 7. 画面構成
+## 6. 画面構成
 
 | # | 画面 | 主な責務 |
 |---|---|---|
-| 1 | **ホーム** | 当日の体重入力 (ホイールピッカー) / 直近7日のミニグラフ |
-| 2 | **カレンダー** | 月表示・各日に体重バッジ・タップで日詳細へ遷移 |
-| 3 | **グラフ** | 期間切替 (1週/1ヶ月/3ヶ月/全期間) の折れ線 (Vico) |
-| 4 | **日詳細** | 体重編集 + メモ一覧 (追加/編集/削除/並び替え) |
-| 5 | **設定** | CSV import/export・テーマ・目標体重 |
+| 1 | ホーム | 当日の体重入力と直近の傾向表示 |
+| 2 | カレンダー | 月単位の体重推移の把握と日詳細への導線 |
+| 3 | グラフ | 期間を切り替えた折れ線による推移確認 |
+| 4 | 日詳細 | その日の体重編集とメモ管理 (追加・編集・削除・並び替え) |
+| 5 | 設定 | CSV import/export、目標体重、テーマ切替 |
 
 ---
 
-## 8. UI / UX 方針
+## 7. UI / UX 方針
+
+### 7.1 基本原則
 
 - **モダンでクール** — Material 3 + Material You (Dynamic Color)。意味のあるモーション、控えめなハプティクス
-- **片手操作を最優先** — 重要なタップ対象はすべて画面下部に配置する
-  - 主要ナビゲーションは **Bottom Navigation Bar**
-  - 記録追加は **右下 FAB**
-  - 編集・選択操作は **Bottom Sheet**
-  - 上部 AppBar は装飾・タイトル用に留め、操作の主導線にしない
-- スワイプジェスチャを活用 (カレンダー月切替・グラフ期間切替)
+- **片手操作を最優先** — 主要な操作導線はすべて画面下部に配置する。上部 AppBar は装飾・タイトル用に留め、操作の主導線にしない
+- スワイプジェスチャを活用 (カレンダー月切替・グラフ期間切替など)
 - タップ領域は最低 **48dp**、隣接ターゲット間に十分な余白
 - 入力フォームはキーボードで隠れないよう `imePadding` を必ず適用
 
-### 設計原則 (機能の意図)
+### 7.2 設計原則 (機能の意図)
 
 - **メモは日記用途**: 日々の体重変動の理由 (飲み会、暴飲暴食、体調変化など) を残し、あとで体重推移と並べて振り返るためのもの。TODO リストや直近通知のような「ホーム画面の常設一覧」としては扱わない。メモ UI は日詳細画面に集約する。
-- **体重グラフのスケール**: Y 軸は 0 始まりにしない。直近データの平均を中心に、min/max から対称な狭いレンジで切って「変動」を可視化する。体重は日次で大きく変わらないため、絶対値の表示よりも差分の可視化が優先される。共通ヘルパー `ui/chart/components/WeightChartAxes.kt` の `weightRangeProvider` / `dateAxisFormatter` をホームのミニチャート・グラフタブの両方で使う。
+- **体重グラフのスケール**: Y 軸は 0 始まりにしない。直近データを中心に、min/max から対称な狭いレンジで切って「変動」を可視化する。体重は日次で大きく変わらないため、絶対値の表示よりも差分の可視化が優先される。ホームのミニチャートとグラフタブは同一の軸設定を共有する。
 - **X 軸ラベル**: インデックス (0,1,2…) ではなく `M/d` 形式の日付を表示する。
-- **体重入力はキーボード非使用**: ホームタブの「今日の体重」は `ui/components/WheelWeightPicker` (整数部 + 小数部) で入力する。`OutlinedTextField` + Decimal キーボードはホームでは使わない (詳細画面・目標体重欄ではそのまま `WeightNumberField` を使う)。デフォルト値は (1) 今日の既存記録、(2) 最新の記録 (`GetLatestWeightUseCase`)、(3) まだ 1 件も無ければ `HomeUiState.DEFAULT_WEIGHT_KG` (60.0kg) の順で決定する。入力刻みは **0.1kg**。
-- **Dynamic Color は常時 ON**: minSdk 31 なので Material You のダイナミックカラーが常に利用可能。ユーザー設定項目として露出しない。`TaijuTheme` は `dynamicDarkColorScheme` / `dynamicLightColorScheme` のみを使い、フォールバックパレットは持たない。
+- **体重入力はホイール UI が基本**: 頻度の高い日々の体重入力はホイールピッカー (整数部 + 小数部) を使い、ソフトキーボードは立ち上げない。入力刻みは **0.1kg**。目標体重など変更頻度の低い設定値については数値入力フィールドでよい。日々の入力のデフォルト値は (1) 対象日に既存記録があればそれ、(2) 無ければ最新の記録、(3) それも無ければ既定値 (60.0kg) の順で決定する。
+- **Dynamic Color は常時 ON**: minSdk 31 なので Material You のダイナミックカラーが常に利用可能。パレットはシステムに従い、アプリ独自のフォールバックカラーは持たないしユーザー設定にも露出しない。Light / Dark / System (端末設定に従う) の選択 UI はこれと独立に提供してよい。
 
 ---
 
-## 9. CSV 仕様
+## 8. CSV 仕様 (外部契約)
 
 - 文字コード: **UTF-8 (BOM 無)** / 改行: **LF** / 区切り: **`,`**
 - エクスポート/インポートは **2ファイルを ZIP で一括** 扱う:
@@ -164,27 +102,25 @@ taiju/
 
 ---
 
-## 10. パッケージ管理ルール
+## 9. 運用ルール
+
+### 9.1 パッケージ管理
 
 - 依存追加は **必ず `gradle/libs.versions.toml` 経由** (build.gradle.kts への直書き禁止)
-- バージョンは可能な限り **メジャー寄せ** (例: `compose-bom = "2025.x.x"` のように BOM で統一)
+- バージョンは可能な限り BOM / version catalog で一元管理する
 - **`gradle.lockfile` をコミット** し、CI と開発環境のビルド再現性を担保
-- 更新は明示的に `./gradlew dependencies --write-locks` を実行
+- 依存更新は明示的に `./gradlew dependencies --write-locks` を実行
 
----
+### 9.2 バージョン管理
 
-## 10.1 バージョン管理
-
-- アプリのバージョンは **プロジェクトルートの `VERSION` ファイル** が正 (例: `0.1.0`)
+- アプリのバージョンは **プロジェクトルートの `VERSION` ファイル** が正 (例: `1.0.0`)
 - `app/build.gradle.kts` は `VERSION` を読み `versionName` と `versionCode` を導出する
   - `versionCode` = `major * 10000 + minor * 100 + patch` (例: `0.1.0` → `100`、`0.2.0` → `200`、`1.2.3` → `10203`)
   - 制約: minor / patch は `0..99`
 - バージョン更新は `VERSION` を書き換えるだけ。`build.gradle.kts` は触らない
 - リリースの具体的な手順・Secrets 名・CI のふるまいは [README.md](./README.md) の「リリース手順」節を参照
 
----
-
-## 11. git 運用ルール
+### 9.3 git 運用
 
 - ユーザーから明示指示があるまで **`git add` / `git commit` を自動実行しない**
 - `main` への直接コミット禁止 / `feature/<topic>` ブランチで作業
@@ -192,29 +128,15 @@ taiju/
 
 ---
 
-## 12. テスト・検証方針
+## 10. テスト・検証方針
 
-| 対象 | ツール | 配置 |
-|---|---|---|
-| ViewModel / UseCase | JUnit + Turbine + kotlinx-coroutines-test | `src/test/` |
-| Room DAO | androidx.room testing + Robolectric/Instrumented | `src/androidTest/` |
-| 主要 Composable | Compose UI Test | `src/androidTest/` |
-
+- ViewModel / UseCase を中心とした JVM テストを `src/test/` に書く。instrumented テスト (`src/androidTest/`) は必要が生じた時点で追加する
 - 型チェックとテストはコード正当性の確認であって **機能の正しさは保証しない**
 - UI 変更後は **必ず Android Studio エミュレータまたは実機で起動・操作確認** を行うこと
 - 確認できない環境の場合は「UI を実機で確認していない」ことを明示する (sycophantic な完了報告を避ける)
 
 ---
 
-## 13. 開発コマンド
+## 11. 開発コマンド
 
-```bash
-./gradlew assembleDebug          # debug APK ビルド
-./gradlew installDebug           # エミュレータ/実機にインストール
-./gradlew test                   # unit テスト (JVM)
-./gradlew connectedAndroidTest   # instrumented テスト (端末必要)
-./gradlew lint                   # Android Lint
-./gradlew ktlintCheck            # ktlint チェック
-./gradlew ktlintFormat           # ktlint 自動修正
-./gradlew dependencies --write-locks   # 依存ロック更新
-```
+開発・ビルド・リリース・検証に必要なコマンドはすべて **プロジェクトルートの `justfile`** に recipe として集約する。`./gradlew` や `adb` を直接叩くのではなく `just <recipe>` から呼び出すこと。新しい定型操作が必要になったら justfile に recipe を追記する。利用可能な recipe 一覧は `just --list` (引数なしの `just` でも可) で確認できる。
