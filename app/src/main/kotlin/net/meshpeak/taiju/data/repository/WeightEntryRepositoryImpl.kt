@@ -31,6 +31,8 @@ class WeightEntryRepositoryImpl
 
         override suspend fun findByDate(date: LocalDate): WeightEntry? = dao.findByDate(date)?.toDomain()
 
+        override suspend fun findLatest(): WeightEntry? = dao.findLatest()?.toDomain()
+
         override suspend fun existingDates(): Set<LocalDate> = dao.allDates().toSet()
 
         override suspend fun upsert(
@@ -38,16 +40,12 @@ class WeightEntryRepositoryImpl
             weightKg: Double,
         ) {
             val now = timeProvider.now()
-            val existing = dao.findByDate(date)
-            val entity =
-                existing?.copy(weightKg = weightKg, updatedAt = now)
-                    ?: WeightEntryEntity(
-                        date = date,
-                        weightKg = weightKg,
-                        createdAt = now,
-                        updatedAt = now,
-                    )
-            dao.upsert(entity)
+            dao.upsertByDate(
+                date = date,
+                weightKg = weightKg,
+                createdAt = now,
+                updatedAt = now,
+            )
         }
 
         override suspend fun deleteByDate(date: LocalDate) {

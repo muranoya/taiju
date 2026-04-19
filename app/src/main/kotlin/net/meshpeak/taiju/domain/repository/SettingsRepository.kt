@@ -9,7 +9,5 @@ interface SettingsRepository {
 
     suspend fun setTheme(theme: AppTheme)
 
-    suspend fun setUseDynamicColor(enabled: Boolean)
-
     suspend fun setTargetWeight(kg: Double?)
 }

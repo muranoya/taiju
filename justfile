@@ -31,6 +31,15 @@ release:
     @echo "Release APK: app/build/outputs/apk/release/"
     @echo "(unsigned — configure signingConfigs.release before distributing)"
 
+# Run JVM unit tests
+test:
+    ./gradlew test
+
+# Build a release APK. Signed if RELEASE_KEYSTORE_* env vars are set (see README), otherwise unsigned.
+build-release:
+    ./gradlew assembleRelease
+    @echo "Release APK: app/build/outputs/apk/release/"
+
 # Clean all build outputs
 clean:
     ./gradlew clean

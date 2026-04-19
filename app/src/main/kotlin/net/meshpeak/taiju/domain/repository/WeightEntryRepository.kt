@@ -16,6 +16,8 @@ interface WeightEntryRepository {
 
     suspend fun findByDate(date: LocalDate): WeightEntry?
 
+    suspend fun findLatest(): WeightEntry?
+
     suspend fun existingDates(): Set<LocalDate>
 
     suspend fun upsert(

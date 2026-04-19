@@ -1,3 +1,19 @@
+val appVersion: Pair<String, Int> =
+    run {
+        val versionFile = rootProject.file("VERSION")
+        require(versionFile.exists()) { "VERSION file not found at ${versionFile.absolutePath}" }
+        val versionName = versionFile.readText().trim()
+        val parts = versionName.split(".")
+        require(parts.size == 3 && parts.all { it.toIntOrNull() != null }) {
+            "VERSION must be semver X.Y.Z, got: '$versionName'"
+        }
+        val (major, minor, patch) = parts.map { it.toInt() }
+        require(minor in 0..99 && patch in 0..99) {
+            "minor and patch must be 0..99 in '$versionName' (versionCode formula: major*10000 + minor*100 + patch)"
+        }
+        versionName to (major * 10000 + minor * 100 + patch)
+    }
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -15,12 +31,31 @@ android {
         applicationId = "net.meshpeak.taiju"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersion.second
+        versionName = appVersion.first
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
+
+    val releaseSigningConfig =
+        signingConfigs.create("release") {
+            val storeFileEnv = System.getenv("RELEASE_KEYSTORE_PATH")
+            val storePasswordEnv = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            val keyAliasEnv = System.getenv("RELEASE_KEY_ALIAS")
+            val keyPasswordEnv = System.getenv("RELEASE_KEY_PASSWORD")
+            if (
+                !storeFileEnv.isNullOrBlank() &&
+                !storePasswordEnv.isNullOrBlank() &&
+                !keyAliasEnv.isNullOrBlank() &&
+                !keyPasswordEnv.isNullOrBlank()
+            ) {
+                storeFile = file(storeFileEnv)
+                storePassword = storePasswordEnv
+                keyAlias = keyAliasEnv
+                keyPassword = keyPasswordEnv
+            }
+        }
 
     buildTypes {
         debug {
@@ -33,6 +68,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (releaseSigningConfig.storeFile != null) {
+                signingConfig = releaseSigningConfig
+            }
         }
     }
 
@@ -104,6 +142,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.vico.compose.m3)
+
+    implementation(libs.reorderable)
 
     implementation(libs.androidx.datastore.preferences)
 

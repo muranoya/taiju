@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,9 +20,7 @@ import net.meshpeak.taiju.domain.model.AppTheme
 @Composable
 fun ThemePickerSection(
     theme: AppTheme,
-    useDynamicColor: Boolean,
     onThemeChange: (AppTheme) -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -56,22 +52,6 @@ fun ThemePickerSection(
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
-            }
-            HorizontalDivider()
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("ダイナミックカラー", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = "壁紙からの配色を適用 (Android 12+)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = useDynamicColor, onCheckedChange = onDynamicColorChange)
             }
         }
     }

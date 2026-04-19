@@ -25,17 +25,12 @@ class SettingsRepositoryImpl
                         prefs[SettingsKeys.THEME]
                             ?.let { runCatching { AppTheme.valueOf(it) }.getOrNull() }
                             ?: AppTheme.SYSTEM,
-                    useDynamicColor = prefs[SettingsKeys.USE_DYNAMIC_COLOR] ?: true,
                     targetWeightKg = prefs[SettingsKeys.TARGET_WEIGHT_KG],
                 )
             }
 
         override suspend fun setTheme(theme: AppTheme) {
             dataStore.edit { it[SettingsKeys.THEME] = theme.name }
-        }
-
-        override suspend fun setUseDynamicColor(enabled: Boolean) {
-            dataStore.edit { it[SettingsKeys.USE_DYNAMIC_COLOR] = enabled }
         }
 
         override suspend fun setTargetWeight(kg: Double?) {

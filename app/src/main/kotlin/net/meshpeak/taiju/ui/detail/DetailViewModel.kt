@@ -4,7 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -19,6 +22,7 @@ import net.meshpeak.taiju.domain.usecase.UpsertMemoUseCase
 import net.meshpeak.taiju.domain.usecase.UpsertWeightUseCase
 import net.meshpeak.taiju.ui.navigation.TaijuDestination
 import javax.inject.Inject
+import kotlin.math.round
 
 @HiltViewModel
 class DetailViewModel
@@ -41,52 +45,55 @@ class DetailViewModel
         private val _state = MutableStateFlow(DetailUiState(date = date))
         val state = _state.asStateFlow()
 
+        private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+        private var userTouchedInput = false
+
         init {
             getDayDetail(date)
                 .onEach { detail ->
                     val current = _state.value
-                    val inputLooksFresh = current.weightInput.isBlank() || current.weight == null
                     _state.value =
                         current.copy(
                             weight = detail.weight,
                             memos = detail.memos,
-                            weightInput =
-                                if (inputLooksFresh) {
-                                    detail.weight?.weightKg?.let { "%.1f".format(it) } ?: ""
+                            inputWeightKg =
+                                if (!userTouchedInput) {
+                                    detail.weight?.weightKg?.roundTo1() ?: current.inputWeightKg
                                 } else {
-                                    current.weightInput
+                                    current.inputWeightKg
                                 },
                         )
                 }
                 .launchIn(viewModelScope)
         }
 
-        fun onWeightInputChange(value: String) {
-            _state.value = _state.value.copy(weightInput = value, errorMessage = null)
+        fun onValueChange(value: Double) {
+            userTouchedInput = true
+            _state.value = _state.value.copy(inputWeightKg = value.roundTo1())
         }
 
         fun onSaveWeight() {
-            val raw = _state.value.weightInput.trim()
-            val value = raw.toDoubleOrNull()
-            if (value == null) {
-                _state.value = _state.value.copy(errorMessage = "数値を入力してください")
-                return
-            }
+            val value = _state.value.inputWeightKg
+            val hadExisting = _state.value.weight != null
             viewModelScope.launch {
                 _state.value = _state.value.copy(saving = true)
                 val res = upsertWeight(date, value)
-                _state.value =
-                    _state.value.copy(
-                        saving = false,
-                        errorMessage = res.exceptionOrNull()?.message,
-                    )
+                _state.value = _state.value.copy(saving = false)
+                if (res.isSuccess) {
+                    _messages.emit(if (hadExisting) "体重を更新しました" else "体重を記録しました")
+                } else {
+                    _messages.emit(res.exceptionOrNull()?.message ?: "保存に失敗しました")
+                }
             }
         }
 
         fun onDeleteWeight() {
             viewModelScope.launch {
                 deleteWeight(date)
-                _state.value = _state.value.copy(weightInput = "")
+                userTouchedInput = false
+                _messages.emit("体重を削除しました")
             }
         }
 
@@ -133,15 +140,18 @@ class DetailViewModel
                     }
                 if (res.isSuccess) {
                     onDismissSheet()
+                    _messages.emit(if (editing == null) "メモを追加しました" else "メモを更新しました")
                 } else {
-                    _state.value =
-                        _state.value.copy(errorMessage = res.exceptionOrNull()?.message)
+                    _messages.emit(res.exceptionOrNull()?.message ?: "メモの保存に失敗しました")
                 }
             }
         }
 
         fun onDeleteMemo(id: Long) {
-            viewModelScope.launch { deleteMemo(id) }
+            viewModelScope.launch {
+                deleteMemo(id)
+                _messages.emit("メモを削除しました")
+            }
         }
 
         fun onMoveMemo(
@@ -157,7 +167,5 @@ class DetailViewModel
             viewModelScope.launch { reorderMemos(orderedIds) }
         }
 
-        fun onDismissError() {
-            _state.value = _state.value.copy(errorMessage = null)
-        }
+        private fun Double.roundTo1(): Double = round(this * 10) / 10
     }

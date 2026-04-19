@@ -37,12 +37,28 @@ fun WeightLineChart(
             }
         }
     }
+    val values = remember(points) { points.map { it.weightKg } }
+    val dates = remember(points) { points.map { it.date } }
+    val extras = remember(targetWeightKg) { listOfNotNull(targetWeightKg) }
+    val rangeProvider = remember(values, extras) { weightRangeProvider(values, extras) }
+    val formatter = remember(dates) { dateAxisFormatter(dates) }
+    val itemPlacer =
+        remember(dates) {
+            val step = maxOf(1, (dates.size + 5) / 6)
+            HorizontalAxis.ItemPlacer.aligned(spacing = step)
+        }
+    val labelComponent = rememberWeightAxisLabel()
     CartesianChartHost(
         chart =
             rememberCartesianChart(
-                rememberLineCartesianLayer(),
-                startAxis = VerticalAxis.rememberStart(),
-                bottomAxis = HorizontalAxis.rememberBottom(),
+                rememberLineCartesianLayer(rangeProvider = rangeProvider),
+                startAxis = VerticalAxis.rememberStart(label = labelComponent),
+                bottomAxis =
+                    HorizontalAxis.rememberBottom(
+                        label = labelComponent,
+                        valueFormatter = formatter,
+                        itemPlacer = itemPlacer,
+                    ),
             ),
         modelProducer = producer,
         modifier =

@@ -13,7 +13,6 @@ import net.meshpeak.taiju.domain.model.AppTheme
 import net.meshpeak.taiju.domain.usecase.ExportCsvUseCase
 import net.meshpeak.taiju.domain.usecase.GetUserSettingsUseCase
 import net.meshpeak.taiju.domain.usecase.ImportCsvUseCase
-import net.meshpeak.taiju.domain.usecase.UpdateDynamicColorUseCase
 import net.meshpeak.taiju.domain.usecase.UpdateTargetWeightUseCase
 import net.meshpeak.taiju.domain.usecase.UpdateThemeUseCase
 import javax.inject.Inject
@@ -24,7 +23,6 @@ class SettingsViewModel
     constructor(
         getUserSettings: GetUserSettingsUseCase,
         private val updateTheme: UpdateThemeUseCase,
-        private val updateDynamicColor: UpdateDynamicColorUseCase,
         private val updateTargetWeight: UpdateTargetWeightUseCase,
         private val exportCsv: ExportCsvUseCase,
         private val importCsv: ImportCsvUseCase,
@@ -39,7 +37,6 @@ class SettingsViewModel
                     _state.value =
                         current.copy(
                             theme = settings.theme,
-                            useDynamicColor = settings.useDynamicColor,
                             targetWeightKg = settings.targetWeightKg,
                             targetWeightInput =
                                 if (current.targetWeightInput.isBlank()) {
@@ -54,10 +51,6 @@ class SettingsViewModel
 
         fun onThemeChange(theme: AppTheme) {
             viewModelScope.launch { updateTheme(theme) }
-        }
-
-        fun onDynamicColorChange(enabled: Boolean) {
-            viewModelScope.launch { updateDynamicColor(enabled) }
         }
 
         fun onTargetWeightInputChange(value: String) {

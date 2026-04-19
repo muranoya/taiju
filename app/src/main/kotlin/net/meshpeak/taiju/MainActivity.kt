@@ -23,7 +23,6 @@ class MainActivity : ComponentActivity() {
             val settings by rootViewModel.settings.collectAsStateWithLifecycle()
             TaijuTheme(
                 appTheme = settings.theme,
-                useDynamicColor = settings.useDynamicColor,
             ) {
                 TaijuApp()
             }

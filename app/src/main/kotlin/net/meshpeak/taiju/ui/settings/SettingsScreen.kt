@@ -52,9 +52,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         ) {
             ThemePickerSection(
                 theme = state.theme,
-                useDynamicColor = state.useDynamicColor,
                 onThemeChange = viewModel::onThemeChange,
-                onDynamicColorChange = viewModel::onDynamicColorChange,
             )
             TargetWeightSection(
                 input = state.targetWeightInput,
